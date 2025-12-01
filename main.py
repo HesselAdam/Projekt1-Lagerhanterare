@@ -23,6 +23,13 @@ DEFAULT_PRODUCTS = [
     {"id": 2, "name": "Tavla - Stad", "desc": "Svartvit fotokonst", "price": 299.0, "quantity": 8},
 ]
 
+# Ensure we can read/write Swedish characters (å, ä, ö) in both terminal and files.
+for stream in (sys.stdin, sys.stdout, sys.stderr):
+    try:
+        stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 def format_currency(value):
     try:
         return locale.currency(value, grouping=True)
@@ -35,7 +42,7 @@ def load_data(filename):
     if not os.path.exists(filename):
         return products
 
-    with open(filename, 'r') as file:       #öppnar en fil med read-rättighet
+    with open(filename, 'r', encoding='utf-8') as file:       #öppnar en fil med read-rättighet
         reader = csv.DictReader(file)
         for row in reader:
             id = int(row['id'])
@@ -57,7 +64,7 @@ def load_data(filename):
 
 # SPARAR DATAN SÅ JAG KAN RADERA BORT EN PRODUKT.
 def save_data(filename, products):
-    with open(filename, 'w', newline='') as file:
+    with open(filename, 'w', newline='', encoding='utf-8') as file:
         fieldnames = ['id', 'name', 'desc', 'price', 'quantity']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
@@ -76,7 +83,7 @@ def _read_key():
         key = msvcrt.getch()
         if key in (b"\x00", b"\xe0"):  # special key prefix
             key += msvcrt.getch()
-        return key.decode(errors="ignore")
+        return key.decode(encoding="utf-8", errors="replace")
     if not termios or not tty:
         return sys.stdin.read(1)
 
