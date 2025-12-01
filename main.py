@@ -106,14 +106,16 @@ def main_menu(products, selected_product=None):
     """Simple menu shown after browsing."""
     os.system('cls' if os.name == 'nt' else 'clear')
     print("=== Lagerhanterare ===")
-    print("1) Ändra produkt (lämna fält tomt för att behålla värde)")
-    print("2) Visa statistik")
-    print("3) Avsluta")
-    choice = input("Välj: ").strip()
-    if choice == "1":
+    print("Tryck C för att ändra vald produkt, S för statistik, eller Enter/Esc för att avsluta.")
+    raw = _read_key()
+    choice = raw.lower()
+    if choice in ("", "\r", "\n") or raw == "\x1b":  # Enter/Esc avslutar
+        return False
+    if choice == "c":
         change_product(products, "Ändra data för produkt", selected_product)
-        return
-    if choice == "2":
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return True
+    if choice == "s":
         val = option_menu()
         numererad_lista(products, val)
         statistics(products, val)
@@ -125,8 +127,10 @@ def main_menu(products, selected_product=None):
             remove_product_by_id(products, val, product_id)
         add_product(products, val)
         change_product(products, val, selected_product)
-        return
-    # any other input just exits
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return True
+    # any other key just exits back to browser
+    return True
 
 def browse_products(products):
     """Simple cursor-based browser for the product list. Returns selected product (or None)."""
@@ -280,6 +284,9 @@ except locale.Error:
 ensure_data_file(DB_FILE)
 products = load_data(DB_FILE)
 
-selected = browse_products(products)
-main_menu(products, selected)
+keep_running = True
+while keep_running:
+    selected = browse_products(products)
+    keep_running = main_menu(products, selected)
+
 save_data(DB_FILE, products)
