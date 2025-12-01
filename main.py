@@ -10,6 +10,7 @@ import csv
 import os
 import locale
 import sys
+import shutil
 
 try:
     import termios
@@ -17,11 +18,6 @@ try:
 except ImportError:
     termios = None
     tty = None
-
-DEFAULT_PRODUCTS = [
-    {"id": 1, "name": "Tavla - Hav", "desc": "Oljemålning av havet", "price": 499.0, "quantity": 5},
-    {"id": 2, "name": "Tavla - Stad", "desc": "Svartvit fotokonst", "price": 299.0, "quantity": 8},
-]
 
 # Ensure we can read/write Swedish characters (å, ä, ö) in both terminal and files.
 for stream in (sys.stdin, sys.stdout, sys.stderr):
@@ -74,7 +70,7 @@ def save_data(filename, products):
 def ensure_data_file(filename):
     if os.path.exists(filename):
         return
-    save_data(filename, DEFAULT_PRODUCTS.copy())
+    save_data(filename, [])
 
 def _read_key():
     """Get a single keypress (arrow keys, letters) without needing Enter."""
@@ -83,7 +79,7 @@ def _read_key():
         key = msvcrt.getch()
         if key in (b"\x00", b"\xe0"):  # special key prefix
             key += msvcrt.getch()
-        return key.decode(encoding="utf-8", errors="replace")
+        return key.decode(encoding="latin-1", errors="ignore")  # latin-1 keeps arrow bytes intact
     if not termios or not tty:
         return sys.stdin.read(1)
 
@@ -98,28 +94,42 @@ def _read_key():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
+def _is_up(raw_key):
+    """Return True if keypress is an up arrow (common ANSI/Windows codes)."""
+    return raw_key in ("\x1b[A", "\x1bOA", "\xe0H", "\x00H") or (raw_key.startswith("\x1b[") and raw_key.endswith("A"))
+
+def _is_down(raw_key):
+    """Return True if keypress is a down arrow (common ANSI/Windows codes)."""
+    return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
+
 def browse_products(products):
     """Simple cursor-based browser for the product list."""
     if not products:
         print("Inga produkter i lager. Tryck 'a' för att lägga till en ny eller 'q'/Enter för att fortsätta.")
     index = 0
     while True:
+        term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
         if products:
             os.system('cls' if os.name == 'nt' else 'clear')
-            print("Produkter (Pilar eller W/S för att bläddra, Enter för att fortsätta, A för att lägga till, Q för att avsluta):")
+            print("Produkter (Piltangenter för att bläddra, Enter för att fortsätta, A för att lägga till, Q för att avsluta):")
+            header = f" ID | {'Produktnamn':<30} | Pris      | Antal "
+            print(header.ljust(term_width, "="))
             for i, product in enumerate(products):
-                line = f"{product['id']:>3} - {product['name']:<25} {format_currency(product['price'])} ({product['quantity']} st)"
+                name = product['name'][:30]
+                line = f" {product['id']:>2} | {name:<30} | {format_currency(product['price']):>8} | {product['quantity']:>5} st "
+                line = line.ljust(term_width)
                 if i == index:
-                    print(f"> \033[7m{line}\033[0m")  # invert colors for selection
+                    print(f"\033[7m{line}\033[0m")  # invert colors for selection
                 else:
-                    print(f"  {line}")
+                    print(line)
+            print("=" * term_width)
         raw_key = _read_key()
         key = raw_key.lower()
         if key in ("", "\r", "\n", "q") or raw_key == "\x1b":  # Enter, q eller Esc avslutar
             break
-        if products and (key == "w" or raw_key in ("\x1b[A", "\xe0H") or key == "h"):  # upp
+        if products and _is_up(raw_key):
             index = (index - 1) % len(products)
-        elif products and (key == "s" or raw_key in ("\x1b[B", "\xe0P") or key == "p"):  # ner
+        elif products and _is_down(raw_key):
             index = (index + 1) % len(products)
         elif key == "a":
             add_product(products, "Lägg till produkt")
