@@ -9,6 +9,14 @@ __email__   = "adam.hessel@elev.ga.ntig.se"
 import csv
 import os
 import locale
+import sys
+
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None
+    tty = None
 
 DEFAULT_PRODUCTS = [
     {"id": 1, "name": "Tavla - Hav", "desc": "Oljemålning av havet", "price": 499.0, "quantity": 5},
@@ -60,6 +68,54 @@ def ensure_data_file(filename):
     if os.path.exists(filename):
         return
     save_data(filename, DEFAULT_PRODUCTS.copy())
+
+def _read_key():
+    """Get a single keypress (arrow keys, letters) without needing Enter."""
+    if os.name == "nt":
+        import msvcrt
+        key = msvcrt.getch()
+        if key in (b"\x00", b"\xe0"):  # special key prefix
+            key += msvcrt.getch()
+        return key.decode(errors="ignore")
+    if not termios or not tty:
+        return sys.stdin.read(1)
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        first = sys.stdin.read(1)
+        if first == "\x1b":  # escape sequence
+            return first + sys.stdin.read(2)
+        return first
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+def browse_products(products):
+    """Simple cursor-based browser for the product list."""
+    if not products:
+        print("Inga produkter i lager. Tryck 'a' för att lägga till en ny eller 'q'/Enter för att fortsätta.")
+    index = 0
+    while True:
+        if products:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("Produkter (Pilar eller W/S för att bläddra, Enter för att fortsätta, A för att lägga till, Q för att avsluta):")
+            for i, product in enumerate(products):
+                line = f"{product['id']:>3} - {product['name']:<25} {format_currency(product['price'])} ({product['quantity']} st)"
+                if i == index:
+                    print(f"> \033[7m{line}\033[0m")  # invert colors for selection
+                else:
+                    print(f"  {line}")
+        raw_key = _read_key()
+        key = raw_key.lower()
+        if key in ("", "\r", "\n", "q") or raw_key == "\x1b":  # Enter, q eller Esc avslutar
+            break
+        if products and (key == "w" or raw_key in ("\x1b[A", "\xe0H") or key == "h"):  # upp
+            index = (index - 1) % len(products)
+        elif products and (key == "s" or raw_key in ("\x1b[B", "\xe0P") or key == "p"):  # ner
+            index = (index + 1) % len(products)
+        elif key == "a":
+            add_product(products, "Lägg till produkt")
 
 def numererad_lista(products, option):
     if option == "Numererad lista":
@@ -172,6 +228,8 @@ except locale.Error:
 
 ensure_data_file(DB_FILE)
 products = load_data(DB_FILE)
+
+browse_products(products)
 
 val = option_menu()
 
