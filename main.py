@@ -102,8 +102,34 @@ def _is_down(raw_key):
     """Return True if keypress is a down arrow (common ANSI/Windows codes)."""
     return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
 
+def main_menu(products, selected_product=None):
+    """Simple menu shown after browsing."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("=== Lagerhanterare ===")
+    print("1) Ändra produkt (lämna fält tomt för att behålla värde)")
+    print("2) Visa statistik")
+    print("3) Avsluta")
+    choice = input("Välj: ").strip()
+    if choice == "1":
+        change_product(products, "Ändra data för produkt", selected_product)
+        return
+    if choice == "2":
+        val = option_menu()
+        numererad_lista(products, val)
+        statistics(products, val)
+        if val == "Sök produkt (id)":
+            product_id = int(input("Ange produktens id: "))
+            get_product_by_id(products, val, product_id)
+        if val == "Radera produkt":
+            product_id = int(input("Ange produktens id som ska tas bort: "))
+            remove_product_by_id(products, val, product_id)
+        add_product(products, val)
+        change_product(products, val, selected_product)
+        return
+    # any other input just exits
+
 def browse_products(products):
-    """Simple cursor-based browser for the product list."""
+    """Simple cursor-based browser for the product list. Returns selected product (or None)."""
     if not products:
         print("Inga produkter i lager. Tryck 'a' för att lägga till en ny eller 'q'/Enter för att fortsätta.")
     index = 0
@@ -133,6 +159,7 @@ def browse_products(products):
             index = (index + 1) % len(products)
         elif key == "a":
             add_product(products, "Lägg till produkt")
+    return products[index] if products else None
 
 def numererad_lista(products, option):
     if option == "Numererad lista":
@@ -178,31 +205,38 @@ def add_product(products, option):
         products.append(new_product)
         return print(f"Produkten {name} har lagts till med id {new_id}.")
 
-def change_product(products, option):
-    if option == "Ändra data för produkt":
-        product_id = int(input("Vilken produkt vill du ändra data för? (ange id): "))
-        for product in products:
-            if product["id"] != product_id:
-                continue
+def change_product(products, option, selected_product=None):
+    if option != "Ändra data för produkt":
+        return
 
-            print(f"Nuvarande namn för produkten är: {product['name']}")
-            new_name = input("Ange det nya namnet för produkten: ")
-            product['name'] = new_name if new_name else product['name']
-            
-            print(f"Nuvarande beskrivning för produkten är: {product['desc']}")
-            new_desc = input("Ange den nya beskrivningen för produkten: ")
-            product['desc'] = new_desc if new_desc else product['desc']
-            
-            print(f"Nuvarande pris för produkten är: {product['price']}")
-            new_price = input("Ange det nya priset för produkten: ")
-            product['price'] = float(new_price) if new_price else product['price']
-            
-            print(f"Nuvarande kvantitet för produkten är: {product['quantity']}")
-            new_quantity = input("Ange den nya kvantiteten för produkten: ")
-            product['quantity'] = int(new_quantity) if new_quantity else product['quantity']
-            
-            return print(f"Produkten med id {product_id} har uppdaterats.")
-        print(f"Hittade ingen produkt med id {product_id}.")
+    product = selected_product
+    if not product:
+        product_id = int(input("Vilken produkt vill du ändra data för? (ange id): "))
+        for p in products:
+            if p["id"] == product_id:
+                product = p
+                break
+        if not product:
+            print(f"Hittade ingen produkt med id {product_id}.")
+            return
+
+    print(f"Nuvarande namn för produkten är: {product['name']}")
+    new_name = input("Ange det nya namnet för produkten: ")
+    product['name'] = new_name if new_name else product['name']
+    
+    print(f"Nuvarande beskrivning för produkten är: {product['desc']}")
+    new_desc = input("Ange den nya beskrivningen för produkten: ")
+    product['desc'] = new_desc if new_desc else product['desc']
+    
+    print(f"Nuvarande pris för produkten är: {product['price']}")
+    new_price = input("Ange det nya priset för produkten: ")
+    product['price'] = float(new_price) if new_price else product['price']
+    
+    print(f"Nuvarande kvantitet för produkten är: {product['quantity']}")
+    new_quantity = input("Ange den nya kvantiteten för produkten: ")
+    product['quantity'] = int(new_quantity) if new_quantity else product['quantity']
+    
+    return print(f"Produkten med id {product['id']} har uppdaterats.")
 
 def option_menu():
     options = ["Totalt antal", "Medelvärde", "Sök produkt (id)", "Numererad lista", "Lägg till produkt", "Radera produkt", "Ändra data för produkt"]
@@ -246,22 +280,6 @@ except locale.Error:
 ensure_data_file(DB_FILE)
 products = load_data(DB_FILE)
 
-browse_products(products)
-
-val = option_menu()
-
-numererad_lista(products, val)
-statistics(products, val)
-
-if val == "Sök produkt (id)":
-    product_id = int(input("Ange produktens id: "))
-    get_product_by_id(products, val, product_id)
-
-if val == "Radera produkt":
-    product_id = int(input("Ange produktens id som ska tas bort: "))
-    remove_product_by_id(products, val, product_id)
-
-add_product(products, val)
-change_product(products, val)
-
+selected = browse_products(products)
+main_menu(products, selected)
 save_data(DB_FILE, products)
