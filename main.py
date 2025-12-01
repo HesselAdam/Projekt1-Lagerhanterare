@@ -46,6 +46,7 @@ def load_data(filename):
             desc = row['desc']
             price = float(row['price'])
             quantity = int(row['quantity'])
+            cost = float(row.get('cost', 0) or 0)
             
             products.append(
                 {                   
@@ -53,7 +54,8 @@ def load_data(filename):
                     "name": name,
                     "desc": desc,
                     "price": price,
-                    "quantity": quantity
+                    "quantity": quantity,
+                    "cost": cost
                 }
             )
     return products
@@ -61,7 +63,7 @@ def load_data(filename):
 # SPARAR DATAN SÅ JAG KAN RADERA BORT EN PRODUKT.
 def save_data(filename, products):
     with open(filename, 'w', newline='', encoding='utf-8') as file:
-        fieldnames = ['id', 'name', 'desc', 'price', 'quantity']
+        fieldnames = ['id', 'name', 'desc', 'price', 'quantity', 'cost']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for product in products:
@@ -109,24 +111,17 @@ def main_menu(products, selected_product=None):
     print("Tryck C för att ändra vald produkt, S för statistik, eller Enter/Esc för att avsluta.")
     raw = _read_key()
     choice = raw.lower()
-    if choice in ("", "\r", "\n") or raw == "\x1b":  # Enter/Esc avslutar
-        return False
+    if choice in ("", "\r", "\n") or raw == "\x1b":  # Enter/Esc går tillbaka till listan
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return True
     if choice == "c":
         change_product(products, "Ändra data för produkt", selected_product)
         os.system('cls' if os.name == 'nt' else 'clear')
         return True
     if choice == "s":
-        val = option_menu()
-        numererad_lista(products, val)
-        statistics(products, val)
-        if val == "Sök produkt (id)":
-            product_id = int(input("Ange produktens id: "))
-            get_product_by_id(products, val, product_id)
-        if val == "Radera produkt":
-            product_id = int(input("Ange produktens id som ska tas bort: "))
-            remove_product_by_id(products, val, product_id)
-        add_product(products, val)
-        change_product(products, val, selected_product)
+        os.system('cls' if os.name == 'nt' else 'clear')
+        quick_stats(products)
+        input("\nTryck Enter för att fortsätta...")
         os.system('cls' if os.name == 'nt' else 'clear')
         return True
     # any other key just exits back to browser
@@ -156,6 +151,8 @@ def browse_products(products):
         raw_key = _read_key()
         key = raw_key.lower()
         if key in ("", "\r", "\n", "q") or raw_key == "\x1b":  # Enter, q eller Esc avslutar
+            if key == "q" or raw_key == "\x1b":
+                return None  # signal to exit program
             break
         if products and _is_up(raw_key):
             index = (index - 1) % len(products)
@@ -198,13 +195,15 @@ def add_product(products, option):
         desc = input("Ange produktens beskrivning: ")
         price = float(input("Ange produktens pris: "))
         quantity = int(input("Ange produktens kvantitet: "))
+        cost = float(input("Ange produktens kostnad: "))
 
         new_product = {
             "id":new_id,
             "name": name,
             "desc": desc,
             "price": price,
-            "quantity": quantity
+            "quantity": quantity,
+            "cost": cost
         }
         products.append(new_product)
         return print(f"Produkten {name} har lagts till med id {new_id}.")
@@ -239,6 +238,10 @@ def change_product(products, option, selected_product=None):
     print(f"Nuvarande kvantitet för produkten är: {product['quantity']}")
     new_quantity = input("Ange den nya kvantiteten för produkten: ")
     product['quantity'] = int(new_quantity) if new_quantity else product['quantity']
+
+    print(f"Nuvarande kostnad för produkten är: {product.get('cost', 0)}")
+    new_cost = input("Ange den nya kostnaden för produkten: ")
+    product['cost'] = float(new_cost) if new_cost else product.get('cost', 0)
     
     return print(f"Produkten med id {product['id']} har uppdaterats.")
 
@@ -273,6 +276,26 @@ def statistics(products, option):
         average = total / len(products)
         print(f"Medelpris: {average:.2f} Kr")
 
+def quick_stats(products):
+    """Show a simple stats summary without extra menus."""
+    total_quantity = sum(p['quantity'] for p in products)
+    if not products:
+        print("Inga produkter finns i lager.")
+        return
+
+    total_price = sum(p['price'] for p in products)
+    total_cost = sum(p.get('cost', 0) for p in products)
+    profit_per_item = (total_price - total_cost) / len(products) if products else 0
+
+    stock_value = sum(p['price'] * p['quantity'] for p in products)
+    stock_costs = sum(p.get('cost', 0) * p['quantity'] for p in products)
+
+    print("=== Statistik ===")
+    print(f"Totalt antal produkter: {total_quantity}")
+    print(f"Vinst per produkt: {format_currency(profit_per_item)}")
+    print(f"Lagervärde (pris * antal): {format_currency(stock_value)}")
+    print(f"Kostnader totalt: {format_currency(stock_costs)}")
+
 DB_FILE = 'db_products.csv'
 
 os.system('cls' if os.name == 'nt' else 'clear')
@@ -287,6 +310,8 @@ products = load_data(DB_FILE)
 keep_running = True
 while keep_running:
     selected = browse_products(products)
+    if selected is None:
+        break
     keep_running = main_menu(products, selected)
 
 save_data(DB_FILE, products)
