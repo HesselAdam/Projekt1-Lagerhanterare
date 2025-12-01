@@ -19,7 +19,8 @@ except ImportError:
     termios = None
     tty = None
 
-# Ensure we can read/write Swedish characters (å, ä, ö) in both terminal and files.
+# TODO: Validate inputs (non-negative numbers, required fields) and show friendly errors.
+
 for stream in (sys.stdin, sys.stdout, sys.stderr):
     try:
         stream.reconfigure(encoding="utf-8")
@@ -38,7 +39,7 @@ def load_data(filename):
     if not os.path.exists(filename):
         return products
 
-    with open(filename, 'r', encoding='utf-8') as file:       #öppnar en fil med read-rättighet
+    with open(filename, 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
         for row in reader:
             id = int(row['id'])
@@ -136,7 +137,7 @@ def browse_products(products):
         term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
         if products:
             os.system('cls' if os.name == 'nt' else 'clear')
-            print("Produkter (Piltangenter för att bläddra, Enter för att fortsätta, A för att lägga till, Q för att avsluta):")
+            print("Produkter (Pilar: bläddra | Enter: fortsätt | A: lägg till | D: radera | Q: avsluta)")
             header = f" ID | {'Produktnamn':<30} | Pris      | Antal "
             print(header.ljust(term_width, "="))
             for i, product in enumerate(products):
@@ -160,6 +161,14 @@ def browse_products(products):
             index = (index + 1) % len(products)
         elif key == "a":
             add_product(products, "Lägg till produkt")
+        elif key == "d" and products:
+            prod = products[index]
+            confirm = input(f"Ta bort '{prod['name']}'? (j/n): ").strip().lower()
+            if confirm == "j":
+                products.pop(index)
+                if not products:
+                    return None
+                index = min(index, len(products) - 1)
     return products[index] if products else None
 
 def numererad_lista(products, option):
