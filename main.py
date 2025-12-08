@@ -12,6 +12,13 @@ import locale
 import sys
 import shutil
 
+# Enkla färger för snyggare terminaltext.
+COLOR_RESET = "\033[0m"
+COLOR_YELLOW = "\033[93m"
+COLOR_CYAN = "\033[96m"
+COLOR_DIM = "\033[90m"
+COLOR_SELECTED = "\033[7m"
+
 for stream in (sys.stdin, sys.stdout, sys.stderr):
     try:
         stream.reconfigure(encoding="utf-8")
@@ -23,6 +30,12 @@ def money_text(value):
         return locale.currency(value, grouping=True)
     except Exception:
         return f"{value:.2f} kr"
+
+def shorten(text, max_length):
+    # Kortar ner text och lägger till ...
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 3] + "..."
 
 
 def read_products(filename):
@@ -67,7 +80,7 @@ def read_key():
     key = msvcrt.getch()
     if key in (b"\x00", b"\xe0"):  # arrow/key prefix
         key += msvcrt.getch()
-    return key.decode(encoding="latin-1", errors="ignore")  # keeps arrow bytes intact
+    return key.decode(encoding="latin-1", errors="ignore")
 
 def is_up_arrow(raw_key):
     # True if key press was up arrow.
@@ -78,27 +91,46 @@ def is_down_arrow(raw_key):
     return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
 
 def show_menu(products, selected_product=None):
-    # Menu shown after browsing.
-    os.system('cls')
-    print("=== Lagerhanterare ===")
-    print("Tryck C för att ändra vald produkt, S för statistik, eller Enter/Esc för att avsluta.")
-    raw = read_key()
-    choice = raw.lower()
-    if choice in ("", "\r", "\n") or raw == "\x1b":  # Enter/Esc går tillbaka till listan
-        os.system('cls')
+    # Visa vald produkt och enkla val.
+    if not selected_product:
         return True
-    if choice == "c":
-        change_product(products, "Ändra data för produkt", selected_product)
+
+    while True:
         os.system('cls')
-        return True
-    if choice == "s":
-        os.system('cls')
-        short_stats(products)
-        input("\nTryck Enter för att fortsätta...")
-        os.system('cls')
-        return True
-    # any other key just exits back to browser
-    return True
+        term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+        print(f"{COLOR_YELLOW}VISAR PRODUKT MED ID: {selected_product['id']}{COLOR_RESET}")
+        print(COLOR_DIM + "-" * term_width + COLOR_RESET)
+        print(f"    Namn:        {selected_product['name']}")
+        print(f"    Beskrivning: {selected_product['desc']}")
+        print(f"    Pris:        {money_text(selected_product['price'])}")
+        print(f"    Kvantitet:   {selected_product['quantity']}")
+
+        print()
+        print(f"{COLOR_YELLOW}HANTERA PRODUKT{COLOR_RESET}")
+        print(COLOR_DIM + "-" * 30 + COLOR_RESET)
+        print(f"{COLOR_CYAN}[MELLANSLAG]{COLOR_RESET} Redigera produkt")
+        print(f"{COLOR_CYAN}[D]{COLOR_RESET} Ta bort produkt")
+        print(f"{COLOR_CYAN}[S]{COLOR_RESET} Kort statistik")
+        print(f"{COLOR_CYAN}[ESC/ENTER]{COLOR_RESET} Gå tillbaka")
+
+        raw = read_key()
+        choice = raw.lower()
+
+        if raw in ("", "\r", "\n") or raw == "\x1b":  # Enter eller Esc
+            return True
+        if raw == " ":
+            change_product(products, "Ändra data för produkt", selected_product)
+            continue
+        if choice == "d":
+            confirm = input("Ta bort produkten? (j/n): ").strip().lower()
+            if confirm == "j":
+                products.remove(selected_product)
+                os.system('cls')
+                return True
+        if choice == "s":
+            os.system('cls')
+            short_stats(products)
+            input("\nTryck Enter för att fortsätta...")
 
 def list_products(products):
     # Show products and let the user move with arrow keys.
@@ -109,18 +141,25 @@ def list_products(products):
         term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
         if products:
             os.system('cls')
-            print("Produkter (Pilar: bläddra | Enter: fortsätt | A: lägg till | D: radera | Q: avsluta)")
-            header = f" ID | {'Produktnamn':<30} | Pris      | Antal "
-            print(header.ljust(term_width, "="))
+            title = f"{COLOR_CYAN}Adamos Lagerr{COLOR_RESET}"
+            commands = "[UPP/NED] Navigera  [ENTER] Visa  [A] Ny produkt  [D] Ta bort  [Q/ESC] Avsluta"
+            print(f"{title}  {commands}"[:term_width])
+            print(COLOR_DIM + "-" * term_width + COLOR_RESET)
+            header = f"#  {'NAMN':<25}  {'BESKRIVNING':<45}  {'PRIS':>10}  {'KVANTITET':>9}"
+            print(header[:term_width])
+            print(COLOR_DIM + "-" * term_width + COLOR_RESET)
             for i, product in enumerate(products):
-                name = product['name'][:30]
-                line = f" {product['id']:>2} | {name:<30} | {money_text(product['price']):>8} | {product['quantity']:>5} st "
-                line = line.ljust(term_width)
+                name = shorten(product['name'], 25).ljust(25)
+                desc = shorten(product['desc'], 45).ljust(45)
+                price = money_text(product['price']).rjust(10)
+                qty = str(product['quantity']).rjust(9)
+                line = f"{product['id']:>2}  {name}  {desc}  {price}  {qty}"
+                line = line[:term_width].ljust(term_width)
                 if i == index:
-                    print(f"\033[7m{line}\033[0m")  # invert colors for selection
+                    print(f"{COLOR_SELECTED}{line}{COLOR_RESET}")  # marker för vald rad
                 else:
                     print(line)
-            print("=" * term_width)
+            print(COLOR_DIM + "-" * term_width + COLOR_RESET)
         raw_key = read_key()
         key = raw_key.lower()
         if key in ("", "\r", "\n", "q") or raw_key == "\x1b":  # Enter, q eller Esc avslutar
