@@ -12,29 +12,20 @@ import locale
 import sys
 import shutil
 
-try:
-    import termios
-    import tty
-except ImportError:
-    termios = None
-    tty = None
-
-# TODO: Validate inputs (non-negative numbers, required fields) and show friendly errors.
-
 for stream in (sys.stdin, sys.stdout, sys.stderr):
     try:
         stream.reconfigure(encoding="utf-8")
     except Exception:
         pass
 
-def format_currency(value):
+def money_text(value):
     try:
         return locale.currency(value, grouping=True)
     except Exception:
         return f"{value:.2f} kr"
 
 
-def load_data(filename): 
+def read_products(filename):
     products = []
     if not os.path.exists(filename):
         return products
@@ -61,8 +52,8 @@ def load_data(filename):
             )
     return products
 
-# SPARAR DATAN SÅ JAG KAN RADERA BORT EN PRODUKT.
-def save_data(filename, products):
+# Save products to the CSV file.
+def save_products(filename, products):
     with open(filename, 'w', newline='', encoding='utf-8') as file:
         fieldnames = ['id', 'name', 'desc', 'price', 'quantity', 'cost']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -70,94 +61,75 @@ def save_data(filename, products):
         for product in products:
             writer.writerow(product)
 
-def ensure_data_file(filename):
-    if os.path.exists(filename):
-        return
-    save_data(filename, [])
+def read_key():
+    # Read one key press without needing Enter (Windows only).
+    import msvcrt
+    key = msvcrt.getch()
+    if key in (b"\x00", b"\xe0"):  # arrow/key prefix
+        key += msvcrt.getch()
+    return key.decode(encoding="latin-1", errors="ignore")  # keeps arrow bytes intact
 
-def _read_key():
-    """Get a single keypress (arrow keys, letters) without needing Enter."""
-    if os.name == "nt":
-        import msvcrt
-        key = msvcrt.getch()
-        if key in (b"\x00", b"\xe0"):  # special key prefix
-            key += msvcrt.getch()
-        return key.decode(encoding="latin-1", errors="ignore")  # latin-1 keeps arrow bytes intact
-    if not termios or not tty:
-        return sys.stdin.read(1)
-
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        first = sys.stdin.read(1)
-        if first == "\x1b":  # escape sequence
-            return first + sys.stdin.read(2)
-        return first
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-def _is_up(raw_key):
-    """Return True if keypress is an up arrow (common ANSI/Windows codes)."""
+def is_up_arrow(raw_key):
+    # True if key press was up arrow.
     return raw_key in ("\x1b[A", "\x1bOA", "\xe0H", "\x00H") or (raw_key.startswith("\x1b[") and raw_key.endswith("A"))
 
-def _is_down(raw_key):
-    """Return True if keypress is a down arrow (common ANSI/Windows codes)."""
+def is_down_arrow(raw_key):
+    # True if key press was down arrow.
     return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
 
-def main_menu(products, selected_product=None):
-    """Simple menu shown after browsing."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+def show_menu(products, selected_product=None):
+    # Menu shown after browsing.
+    os.system('cls')
     print("=== Lagerhanterare ===")
     print("Tryck C för att ändra vald produkt, S för statistik, eller Enter/Esc för att avsluta.")
-    raw = _read_key()
+    raw = read_key()
     choice = raw.lower()
     if choice in ("", "\r", "\n") or raw == "\x1b":  # Enter/Esc går tillbaka till listan
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
         return True
     if choice == "c":
         change_product(products, "Ändra data för produkt", selected_product)
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
         return True
     if choice == "s":
-        os.system('cls' if os.name == 'nt' else 'clear')
-        quick_stats(products)
+        os.system('cls')
+        short_stats(products)
         input("\nTryck Enter för att fortsätta...")
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
         return True
     # any other key just exits back to browser
     return True
 
-def browse_products(products):
-    """Simple cursor-based browser for the product list. Returns selected product (or None)."""
+def list_products(products):
+    # Show products and let the user move with arrow keys.
     if not products:
         print("Inga produkter i lager. Tryck 'a' för att lägga till en ny eller 'q'/Enter för att fortsätta.")
     index = 0
     while True:
         term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
         if products:
-            os.system('cls' if os.name == 'nt' else 'clear')
+            os.system('cls')
             print("Produkter (Pilar: bläddra | Enter: fortsätt | A: lägg till | D: radera | Q: avsluta)")
             header = f" ID | {'Produktnamn':<30} | Pris      | Antal "
             print(header.ljust(term_width, "="))
             for i, product in enumerate(products):
                 name = product['name'][:30]
-                line = f" {product['id']:>2} | {name:<30} | {format_currency(product['price']):>8} | {product['quantity']:>5} st "
+                line = f" {product['id']:>2} | {name:<30} | {money_text(product['price']):>8} | {product['quantity']:>5} st "
                 line = line.ljust(term_width)
                 if i == index:
                     print(f"\033[7m{line}\033[0m")  # invert colors for selection
                 else:
                     print(line)
             print("=" * term_width)
-        raw_key = _read_key()
+        raw_key = read_key()
         key = raw_key.lower()
         if key in ("", "\r", "\n", "q") or raw_key == "\x1b":  # Enter, q eller Esc avslutar
             if key == "q" or raw_key == "\x1b":
                 return None  # signal to exit program
             break
-        if products and _is_up(raw_key):
+        if products and is_up_arrow(raw_key):
             index = (index - 1) % len(products)
-        elif products and _is_down(raw_key):
+        elif products and is_down_arrow(raw_key):
             index = (index + 1) % len(products)
         elif key == "a":
             add_product(products, "Lägg till produkt")
@@ -174,7 +146,7 @@ def browse_products(products):
 def numererad_lista(products, option):
     if option == "Numererad lista":
         for i, product in enumerate(products, 1):
-            print(f"{product['id']}) -- {i}. {product['name']} - {format_currency(product['price'])} - {product['quantity']} st")
+            print(f"{product['id']}) -- {i}. {product['name']} - {money_text(product['price'])} - {product['quantity']} st")
 
 
 def get_product_by_id(products, option, products_id):
@@ -285,8 +257,8 @@ def statistics(products, option):
         average = total / len(products)
         print(f"Medelpris: {average:.2f} Kr")
 
-def quick_stats(products):
-    """Show a simple stats summary without extra menus."""
+def short_stats(products):
+    # Quick stats without extra menus.
     total_quantity = sum(p['quantity'] for p in products)
     if not products:
         print("Inga produkter finns i lager.")
@@ -301,26 +273,25 @@ def quick_stats(products):
 
     print("=== Statistik ===")
     print(f"Totalt antal produkter: {total_quantity}")
-    print(f"Vinst per produkt: {format_currency(profit_per_item)}")
-    print(f"Lagervärde (pris * antal): {format_currency(stock_value)}")
-    print(f"Kostnader totalt: {format_currency(stock_costs)}")
+    print(f"Vinst per produkt: {money_text(profit_per_item)}")
+    print(f"Lagervärde (pris * antal): {money_text(stock_value)}")
+    print(f"Kostnader totalt: {money_text(stock_costs)}")
 
 DB_FILE = 'db_products.csv'
 
-os.system('cls' if os.name == 'nt' else 'clear')
+os.system('cls')
 try:
     locale.setlocale(locale.LC_ALL, 'sv_SE.UTF-8')
 except locale.Error:
     locale.setlocale(locale.LC_ALL, '')
 
-ensure_data_file(DB_FILE)
-products = load_data(DB_FILE)
+products = read_products(DB_FILE)
 
 keep_running = True
 while keep_running:
-    selected = browse_products(products)
+    selected = list_products(products)
     if selected is None:
         break
-    keep_running = main_menu(products, selected)
+    keep_running = show_menu(products, selected)
 
-save_data(DB_FILE, products)
+save_products(DB_FILE, products)
