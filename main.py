@@ -11,6 +11,8 @@ import os
 import locale
 import sys
 import shutil
+import webbrowser
+from urllib.parse import quote
 
 # Enkla färger för snyggare terminaltext.
 COLOR_RESET = "\033[0m"
@@ -52,6 +54,7 @@ def read_products(filename):
             price = float(row['price'])
             quantity = int(row['quantity'])
             cost = float(row.get('cost', 0) or 0)
+            product_link_name = (row.get('product_link_name') or "").strip().lstrip("/")
             
             products.append(
                 {                   
@@ -60,7 +63,8 @@ def read_products(filename):
                     "desc": desc,
                     "price": price,
                     "quantity": quantity,
-                    "cost": cost
+                    "cost": cost,
+                    "product_link_name": product_link_name
                 }
             )
     return products
@@ -68,11 +72,11 @@ def read_products(filename):
 # Save products to the CSV file.
 def save_products(filename, products):
     with open(filename, 'w', newline='', encoding='utf-8') as file:
-        fieldnames = ['id', 'name', 'desc', 'price', 'quantity', 'cost']
+        fieldnames = ['id', 'name', 'desc', 'price', 'quantity', 'cost', 'product_link_name']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for product in products:
-            writer.writerow(product)
+            writer.writerow({field: product.get(field, "") for field in fieldnames})
 
 def read_key():
     # Read one key press without needing Enter (Windows only).
@@ -89,6 +93,18 @@ def is_up_arrow(raw_key):
 def is_down_arrow(raw_key):
     # True if key press was down arrow.
     return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
+
+def open_product_link(product):
+    """Open a product link based on the stored link suffix."""
+    base_url = "https://frmd.se/products/"
+    product_link_name = (product.get("product_link_name") or "").strip().lstrip("/")
+    if not product_link_name:
+        print("Produkten saknar produktlänk. Uppdatera den och försök igen.")
+        return
+
+    url = base_url + quote(product_link_name)
+    print(f"Öppnar länk: {url}")
+    webbrowser.open(url)
 
 def show_menu(products, selected_product=None):
     # Visa vald produkt och enkla val.
@@ -111,6 +127,7 @@ def show_menu(products, selected_product=None):
         print(f"{COLOR_CYAN}[MELLANSLAG]{COLOR_RESET} Redigera produkt")
         print(f"{COLOR_CYAN}[D]{COLOR_RESET} Ta bort produkt")
         print(f"{COLOR_CYAN}[S]{COLOR_RESET} Kort statistik")
+        print(f"{COLOR_CYAN}[O]{COLOR_RESET} Öppna produktlänk")
         print(f"{COLOR_CYAN}[ESC/ENTER]{COLOR_RESET} Gå tillbaka")
 
         raw = read_key()
@@ -130,6 +147,9 @@ def show_menu(products, selected_product=None):
         if choice == "s":
             os.system('cls')
             short_stats(products)
+            input("\nTryck Enter för att fortsätta...")
+        if choice == "o":
+            open_product_link(selected_product)
             input("\nTryck Enter för att fortsätta...")
 
 def list_products(products):
@@ -216,6 +236,7 @@ def add_product(products, option):
         price = float(input("Ange produktens pris: "))
         quantity = int(input("Ange produktens kvantitet: "))
         cost = float(input("Ange produktens kostnad: "))
+        product_link_name = input("Ange produktlänk (endast slutet, t.ex. 'are'): ").strip().lstrip("/")
 
         new_product = {
             "id":new_id,
@@ -223,7 +244,8 @@ def add_product(products, option):
             "desc": desc,
             "price": price,
             "quantity": quantity,
-            "cost": cost
+            "cost": cost,
+            "product_link_name": product_link_name
         }
         products.append(new_product)
         return print(f"Produkten {name} har lagts till med id {new_id}.")
@@ -262,6 +284,10 @@ def change_product(products, option, selected_product=None):
     print(f"Nuvarande kostnad för produkten är: {product.get('cost', 0)}")
     new_cost = input("Ange den nya kostnaden för produkten: ")
     product['cost'] = float(new_cost) if new_cost else product.get('cost', 0)
+
+    print(f"Nuvarande produktlänk är: {product.get('product_link_name', '') or '(saknas)'}")
+    new_link = input("Ange den nya produktlänken (endast slutet, lämna tomt för att behålla): ").strip().lstrip("/")
+    product['product_link_name'] = new_link if new_link else product.get('product_link_name', '')
     
     return print(f"Produkten med id {product['id']} har uppdaterats.")
 

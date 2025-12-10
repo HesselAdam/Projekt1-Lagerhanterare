@@ -1,3 +1,8 @@
-id,name,desc,price,quantity,cost
-1,Åre-Tavla,Cool frame of Åre,499.0,5,350.0
-2,Trysil-Tavla,Even cooler frame of Trysil,299.0,8,350.0
+id,name,desc,price,quantity,cost,product_link_name
+1,Åre-Tavla,Tänk dig att ha ditt favoritberg på väggen med ett tjockt snötäcke.,950.0,10,350.0,are
+2,Trysil-Tavla,Varje tavla är utformat för att smälta harmoniskt in i ditt hem och samtidigt ge en unik touch.,1250.0,10,350.0,trysil
+3,Mont_Blanc-Tavla,Upplev storheten av Mont Blanc med denna unika topografiska tavla som visar Alpernas högsta bergs imponerande terräng i detaljerad relief.,1550.0,10,400.0,mont-blanc
+4,Kebnekaise-Tavla,Upplev majestätet av Kebnekaise med denna unika topografiska tavla som visar Sveriges högsta bergs imponerande terräng i detaljerad relief.,1250.0,10,350.0,kebnekaise
+5,Italien-Tavla,Känn djupet i det italienska landskapet med en precisionskapad yta som gör varje berg och dal levande. Från Alpernas majestätiska toppar till Apenninernas böljande kullar – varje detalj är noggrant återgiven för att fånga Italiens unika topografi.,2495.0,10,700.0,italien
+6,Sverige-Tavla,90 x 40 cm tavla perfekt för hemmet eller kontoret. Med innovativ design på FRMD utmanar vi gränserna för design och 3D-printing. Med hjälp av avancerad produktionsteknik och handbearbetad 3D-data skapar vi miniatyrkartor platser runt om i världen.,1850.0,10,700.0,sverige
+7,Åre-Nyckelring,Den minimalistiska designen fångar Åres karaktäristiska topografi i en kompakt form – perfekt som en påminnelse om dina favoritberg eller som en genomtänkt present till någon som älskar Åre.,99.0,100,2.0,frmd-are-nyckelring
