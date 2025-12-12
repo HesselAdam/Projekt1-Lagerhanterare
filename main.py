@@ -94,8 +94,30 @@ def is_down_arrow(raw_key):
     # True if key press was down arrow.
     return raw_key in ("\x1b[B", "\x1bOB", "\xe0P", "\x00P") or (raw_key.startswith("\x1b[") and raw_key.endswith("B"))
 
+def prompt_float(prompt_text, allow_empty=False, default=None):
+    """Prompt for a float, optionally allowing empty input to keep default."""
+    while True:
+        value = input(prompt_text).strip()
+        if allow_empty and value == "":
+            return default
+        try:
+            return float(value)
+        except ValueError:
+            print("Ogiltigt värde, ange ett numeriskt tal.")
+
+def prompt_int(prompt_text, allow_empty=False, default=None):
+    """Prompt for an int, optionally allowing empty input to keep default."""
+    while True:
+        value = input(prompt_text).strip()
+        if allow_empty and value == "":
+            return default
+        try:
+            return int(value)
+        except ValueError:
+            print("Ogiltigt värde, ange ett heltal.")
+
 def open_product_link(product):
-    """Open a product link based on the stored link suffix."""
+    """Open a product link based on the stored link end."""
     base_url = "https://frmd.se/products/"
     product_link_name = (product.get("product_link_name") or "").strip().lstrip("/")
     if not product_link_name:
@@ -233,9 +255,9 @@ def add_product(products, option):
         new_id = max(product["id"] for product in products) + 1 if products else 1
         name = input("Ange produktens namn: ")
         desc = input("Ange produktens beskrivning: ")
-        price = float(input("Ange produktens pris: "))
-        quantity = int(input("Ange produktens kvantitet: "))
-        cost = float(input("Ange produktens kostnad: "))
+        price = prompt_float("Ange produktens pris: ")
+        quantity = prompt_int("Ange produktens kvantitet: ")
+        cost = prompt_float("Ange produktens kostnad: ")
         product_link_name = input("Ange produktlänk (endast slutet, t.ex. 'are'): ").strip().lstrip("/")
 
         new_product = {
@@ -274,16 +296,13 @@ def change_product(products, option, selected_product=None):
     product['desc'] = new_desc if new_desc else product['desc']
     
     print(f"Nuvarande pris för produkten är: {product['price']}")
-    new_price = input("Ange det nya priset för produkten: ")
-    product['price'] = float(new_price) if new_price else product['price']
+    product['price'] = prompt_float("Ange det nya priset för produkten: ", allow_empty=True, default=product['price'])
     
     print(f"Nuvarande kvantitet för produkten är: {product['quantity']}")
-    new_quantity = input("Ange den nya kvantiteten för produkten: ")
-    product['quantity'] = int(new_quantity) if new_quantity else product['quantity']
+    product['quantity'] = prompt_int("Ange den nya kvantiteten för produkten: ", allow_empty=True, default=product['quantity'])
 
     print(f"Nuvarande kostnad för produkten är: {product.get('cost', 0)}")
-    new_cost = input("Ange den nya kostnaden för produkten: ")
-    product['cost'] = float(new_cost) if new_cost else product.get('cost', 0)
+    product['cost'] = prompt_float("Ange den nya kostnaden för produkten: ", allow_empty=True, default=product.get('cost', 0))
 
     print(f"Nuvarande produktlänk är: {product.get('product_link_name', '') or '(saknas)'}")
     new_link = input("Ange den nya produktlänken (endast slutet, lämna tomt för att behålla): ").strip().lstrip("/")
