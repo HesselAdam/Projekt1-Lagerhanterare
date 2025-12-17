@@ -39,6 +39,19 @@ def shorten(text, max_length):
         return text
     return text[: max_length - 3] + "..."
 
+def format_cell(text, width, align="left"):
+    text = str(text)
+    if width <= 0:
+        return ""
+    if len(text) > width:
+        if width <= 3:
+            text = text[:width]
+        elif align == "right":
+            text = "..." + text[-(width - 3):]
+        else:
+            text = text[: width - 3] + "..."
+    return text.rjust(width) if align == "right" else text.ljust(width)
+
 
 def read_products(filename):
     products = []
@@ -187,15 +200,44 @@ def list_products(products):
             commands = "[UPP/NED] Navigera  [ENTER] Visa  [A] Ny produkt  [D] Ta bort  [Q/ESC] Avsluta"
             print(f"{title}  {commands}"[:term_width])
             print(COLOR_DIM + "-" * term_width + COLOR_RESET)
-            header = f"#  {'NAMN':<25}  {'BESKRIVNING':<45}  {'PRIS':>10}  {'KVANTITET':>9}"
-            print(header[:term_width])
+
+            max_id = max((p.get("id", 0) for p in products), default=0)
+            max_qty = max((p.get("quantity", 0) for p in products), default=0)
+            id_w = max(2, len(str(max_id)))
+            qty_w = max(9, len(str(max_qty)))
+
+            price_texts = [money_text(p.get("price", 0)) for p in products]
+            price_w = max(len("PRIS"), max((len(t) for t in price_texts), default=0))
+            price_w = min(price_w, 14)
+
+            seps = 8  # 4x "  " mellan kolumner
+            remaining = term_width - (id_w + price_w + qty_w + seps)
+            name_w, desc_w = 26, 45
+            min_name_w, min_desc_w = 10, 10
+            if remaining <= 0:
+                name_w, desc_w = 1, 1
+            elif remaining < (min_name_w + min_desc_w):
+                name_w = max(1, min(min_name_w, remaining))
+                desc_w = max(1, remaining - name_w)
+            else:
+                name_w = min(name_w, remaining - min_desc_w)
+                desc_w = min(desc_w, remaining - name_w)
+
+            header = (
+                f"{'#':>{id_w}}  "
+                f"{'NAMN':<{name_w}}  "
+                f"{'BESKRIVNING':<{desc_w}}  "
+                f"{'PRIS':>{price_w}}  "
+                f"{'KVANTITET':>{qty_w}}"
+            )
+            print(header[:term_width].ljust(term_width))
             print(COLOR_DIM + "-" * term_width + COLOR_RESET)
             for i, product in enumerate(products):
-                name = shorten(product['name'], 25).ljust(25)
-                desc = shorten(product['desc'], 45).ljust(45)
-                price = money_text(product['price']).rjust(10)
-                qty = str(product['quantity']).rjust(9)
-                line = f"{product['id']:>2}  {name}  {desc}  {price}  {qty}"
+                name = format_cell(shorten(product.get("name", ""), name_w), name_w, "left")
+                desc = format_cell(shorten(product.get("desc", ""), desc_w), desc_w, "left")
+                price = format_cell(money_text(product.get("price", 0)), price_w, "right")
+                qty = format_cell(product.get("quantity", 0), qty_w, "right")
+                line = f"{product.get('id', 0):>{id_w}}  {name}  {desc}  {price}  {qty}"
                 line = line[:term_width].ljust(term_width)
                 if i == index:
                     print(f"{COLOR_SELECTED}{line}{COLOR_RESET}")  # marker för vald rad
