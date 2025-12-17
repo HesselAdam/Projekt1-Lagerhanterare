@@ -34,7 +34,7 @@ def money_text(value):
         return f"{value:.2f} kr"
 
 def shorten(text, max_length):
-    # Kortar ner text och lägger till ...
+    # Here i shorten the text and add this ...
     if len(text) <= max_length:
         return text
     return text[: max_length - 3] + "..."
